@@ -105,7 +105,7 @@ export default function ProfileDashboard() {
           </div>
           
           <div className="flex flex-col relative z-10">
-              <span className="text-xl font-bold text-white tracking-tight">{fullName || 'Doador'}</span>
+               <span className="text-xl font-bold text-white tracking-tight">{fullName || ''}</span>
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1 mt-1">
                  <Shield className="w-3 h-3" /> Administrador Nível 1
               </span>

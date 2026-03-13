@@ -24,7 +24,7 @@ export default function Dashboard() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [lastNewsUpdate, setLastNewsUpdate] = useState<Date | null>(null);
     const { user } = useAuthStore();
-    const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Doador';
+    const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0];
 
     const fetchLatestNews = () => {
         axios.get(`/api/news?t=${Date.now()}`).then(res => {
@@ -63,7 +63,7 @@ export default function Dashboard() {
                     <img src="/tbrain-logo.png" alt="TBrain" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(56,189,248,0.3)]" />
                     <div>
                        <h1 className="text-2xl font-bold text-white tracking-tight">
-                           {greeting}, {userName}
+                           {greeting}{userName ? `, ${userName}` : ''}
                        </h1>
                        <p className="text-zinc-500 text-sm font-medium mt-0.5 text-cyan-400/80">Central de Inteligência TBrain</p>
                     </div>
