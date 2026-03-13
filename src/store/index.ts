@@ -45,35 +45,59 @@ interface FinanceState {
     monthlyIncome: number;
     monthlySpent: number;
     currency: string;
+    cycleStartDay: number;
     fixedCosts: FixedCost[];
     transactions: Transaction[];
     fetchFinance: () => Promise<void>;
     updateSpending: (amount: number) => void;
     addTransaction: (amount: number, type: 'income' | 'expense') => Promise<void>;
     deleteTransaction: (id: string) => Promise<void>;
-    setMonthlyIncome: (amount: number) => void;
-    addFixedCost: (cost: Omit<FixedCost, 'id'>) => void;
-    deleteFixedCost: (id: string) => void;
+    setMonthlyIncome: (amount: number) => Promise<void>;
+    setCycleStartDay: (day: number) => Promise<void>;
+    addFixedCost: (cost: Omit<FixedCost, 'id'>) => Promise<void>;
+    deleteFixedCost: (id: string) => Promise<void>;
     payInstallment: (id: string) => void;
 }
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
     (set, get) => ({
-        dailyLimit: 150,
+        dailyLimit: 0,
         spentToday: 0,
         monthlyIncome: 0,
         monthlySpent: 0,
-        currency: 'BRL',
-        fixedCosts: [
-            { id: 'mock1', name: 'Notebook Pro', totalAmount: 5000, installmentAmount: 500, totalInstallments: 10, paidInstallments: 3, dueDate: 5 },
-            { id: 'mock2', name: 'Assinatura TBrain', totalAmount: 120, installmentAmount: 120, totalInstallments: 1, paidInstallments: 0, dueDate: 10 }
-        ],
+        currency: 'R$',
+        cycleStartDay: 5,
+        fixedCosts: [],
         transactions: [],
         fetchFinance: async () => {
-            const { data } = await supabase.from('transacoes').select('*').order('criado_em', { ascending: false });
-            if (data) {
-                const txs: Transaction[] = data.map(d => ({
+            const { data: txData } = await supabase.from('transacoes').select('*').order('criado_em', { ascending: false });
+            const { data: configData } = await supabase.from('usuario_config').select('*').single();
+            const { data: costsData } = await supabase.from('custos_fixos').select('*');
+
+            let income = 0;
+            let cycleDay = 5;
+            let costs: FixedCost[] = [];
+
+            if (configData) {
+                income = Number(configData.renda_mensal);
+                cycleDay = configData.dia_inicio_ciclo;
+            }
+
+            if (costsData) {
+                costs = costsData.map(c => ({
+                    id: c.id,
+                    name: c.nome,
+                    totalAmount: Number(c.valor_total),
+                    installmentAmount: Number(c.valor_parcela),
+                    totalInstallments: c.parcelas_totais,
+                    paidInstallments: c.parcelas_pagas,
+                    dueDate: c.vencimento
+                }));
+            }
+
+            if (txData) {
+                const txs: Transaction[] = txData.map(d => ({
                     id: d.id,
                     amount: Number(d.valor),
                     type: (d.tipo === 'INCOME' ? 'income' : 'expense') as 'income' | 'expense',
@@ -86,7 +110,34 @@ export const useFinanceStore = create<FinanceState>()(
                     .filter(t => t.type === 'expense' && t.createdAt >= startOfDay.getTime())
                     .reduce((acc, t) => acc + t.amount, 0);
 
-                set({ transactions: txs, spentToday: todaySpend });
+                // Calculate dynamic daily limit
+                const totalFixed = costs.reduce((acc, c) => acc + c.installmentAmount, 0);
+                const availableMonthly = income - totalFixed;
+                
+                // Calculate days left until cycleDay
+                const now = new Date();
+                const currentDay = now.getDate();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                
+                let nextCycleDate = new Date(currentYear, currentMonth, cycleDay);
+                if (currentDay >= cycleDay) {
+                    nextCycleDate = new Date(currentYear, currentMonth + 1, cycleDay);
+                }
+                
+                const diffTime = nextCycleDate.getTime() - now.getTime();
+                const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+                
+                const calculatedLimit = Math.max(0, availableMonthly / daysLeft);
+
+                set({ 
+                    transactions: txs, 
+                    spentToday: todaySpend, 
+                    monthlyIncome: income, 
+                    cycleStartDay: cycleDay, 
+                    fixedCosts: costs,
+                    dailyLimit: calculatedLimit
+                });
             }
         },
         updateSpending: (amount) => set((state) => ({ 
@@ -149,22 +200,44 @@ export const useFinanceStore = create<FinanceState>()(
                 };
             });
         },
-        setMonthlyIncome: (amount) => set({ monthlyIncome: amount }),
-        addFixedCost: (cost) => set((state) => ({
-            fixedCosts: [...state.fixedCosts, { ...cost, id: Math.random().toString(36).substring(7) }]
-        })),
-        deleteFixedCost: (id) => set((state) => ({
-            fixedCosts: state.fixedCosts.filter(c => c.id !== id)
-        })),
+        setMonthlyIncome: async (amount) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            await supabase.from('usuario_config').upsert({ user_id: user.id, renda_mensal: amount });
+            get().fetchFinance();
+        },
+        setCycleStartDay: async (day) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            await supabase.from('usuario_config').upsert({ user_id: user.id, dia_inicio_ciclo: day });
+            get().fetchFinance();
+        },
+        addFixedCost: async (cost) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            
+            await supabase.from('custos_fixos').insert({
+                user_id: user.id,
+                nome: cost.name,
+                valor_total: cost.totalAmount,
+                valor_parcela: cost.installmentAmount,
+                parcelas_totais: cost.totalInstallments,
+                parcelas_pagas: cost.paidInstallments,
+                vencimento: cost.dueDate
+            });
+            get().fetchFinance();
+        },
+        deleteFixedCost: async (id) => {
+            await supabase.from('custos_fixos').delete().eq('id', id);
+            get().fetchFinance();
+        },
         payInstallment: (id) => set((state) => ({
-            fixedCosts: state.fixedCosts.map(c => 
-                c.id === id ? { ...c, paidInstallments: Math.min(c.paidInstallments + 1, c.totalInstallments) } : c
+            fixedCosts: state.fixedCosts.map(cost => 
+                cost.id === id ? { ...cost, paidInstallments: cost.paidInstallments + 1 } : cost
             )
-        }))
+        })),
     }),
-    {
-      name: 'tscript-finance-storage', // unique name
-    }
+    { name: 'tscript-finance-storage' }
   )
 );
 

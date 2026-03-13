@@ -21,11 +21,13 @@ const mockDailyData = [
 ];
 
 export default function FinanceReport() {
-  const { spentToday, dailyLimit, monthlyIncome, monthlySpent, addTransaction, deleteTransaction, setMonthlyIncome, fixedCosts, addFixedCost, deleteFixedCost, transactions } = useFinanceStore();
+  const { spentToday, dailyLimit, monthlyIncome, monthlySpent, addTransaction, deleteTransaction, setMonthlyIncome, cycleStartDay, setCycleStartDay, fixedCosts, addFixedCost, deleteFixedCost, transactions } = useFinanceStore();
   const [activeTab, setActiveTab] = useState('overview');
   
   const [amountInput, setAmountInput] = useState('');
-  const [showIncomePrompt, setShowIncomePrompt] = useState(monthlyIncome === 0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [tempIncome, setTempIncome] = useState(monthlyIncome.toString());
+  const [tempCycle, setTempCycle] = useState(cycleStartDay.toString());
 
   // Form states for Fixed Costs
   const [showFixedCostForm, setShowFixedCostForm] = useState(false);
@@ -34,9 +36,20 @@ export default function FinanceReport() {
   const [fixedInstallments, setFixedInstallments] = useState('1');
   const [fixedDueDate, setFixedDueDate] = useState('5');
 
+  const totalFixed = fixedCosts.reduce((acc, c) => acc + c.installmentAmount, 0);
+  const availableMonthly = monthlyIncome - totalFixed;
   const budgetHealth = dailyLimit > 0 ? ((dailyLimit - spentToday) / dailyLimit) * 100 : 0;
   const isHealthy = budgetHealth > 20;
-  const monthlyBalance = monthlyIncome - monthlySpent;
+
+  // Calculate days left
+  const now = new Date();
+  const currentDay = now.getDate();
+  let nextCycleDate = new Date(now.getFullYear(), now.getMonth(), cycleStartDay);
+  if (currentDay >= cycleStartDay) {
+      nextCycleDate = new Date(now.getFullYear(), now.getMonth() + 1, cycleStartDay);
+  }
+  const diffTime = nextCycleDate.getTime() - now.getTime();
+  const daysLeft = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
   const handleAddTransaction = (type: 'income' | 'expense') => {
       const val = parseFloat(amountInput);
@@ -73,34 +86,57 @@ export default function FinanceReport() {
           <img src="/tbrain-logo.png" alt="TBrain" className="w-10 h-10 rounded-xl shadow-[0_0_12px_rgba(56,189,248,0.2)]" />
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Finanças</h1>
-            <p className="text-sm text-zinc-400">Análise Inteligente e Tendências</p>
+            <p className="text-sm text-zinc-400">Fluxo: Mês {new Date().getMonth() + 1}</p>
           </div>
         </div>
+        <button 
+           onClick={() => { setTempIncome(monthlyIncome.toString()); setTempCycle(cycleStartDay.toString()); setShowSettings(!showSettings); }}
+           className="glass-panel p-2.5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors"
+        >
+            <Activity className="w-5 h-5 text-zinc-400" />
+        </button>
       </div>
 
-      {/* Monthly Budget Setup Prompt */}
-      {showIncomePrompt && (
-          <div className="glass-panel rounded-2xl p-4 border border-emerald-500/30 bg-emerald-950/20">
-              <h3 className="text-sm font-semibold text-emerald-400 mb-2">Definir Renda Mensal Inicial</h3>
-              <div className="flex gap-2">
-                 <input 
-                    type="number" 
-                    placeholder="Ex: 5000" 
-                    className="flex-1 bg-zinc-900/50 border border-zinc-700 rounded-xl px-3 text-sm text-white focus:outline-none focus:border-emerald-500"
-                    onChange={(e) => setAmountInput(e.target.value)}
-                 />
-                 <button 
-                    onClick={() => {
-                        const val = parseFloat(amountInput);
-                        if (!isNaN(val)) {
-                            setMonthlyIncome(val);
-                            setShowIncomePrompt(false);
-                            setAmountInput('');
-                        }
-                    }}
-                    className="bg-emerald-500 text-zinc-950 px-4 py-2 rounded-xl text-sm font-bold"
-                 >Salvar</button>
+      {/* Monthly Budget Setup & Settings */}
+      {(monthlyIncome === 0 || showSettings) && (
+          <div className="glass-panel rounded-[2rem] p-6 border border-emerald-500/30 bg-emerald-950/10 shadow-lg animate-in fade-in zoom-in-95 duration-300">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                 <Target className="w-4 h-4"/> Configuração de Ciclo
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider pl-1">Renda Mensal (R$)</label>
+                      <input 
+                         type="number" 
+                         value={tempIncome}
+                         onChange={(e) => setTempIncome(e.target.value)}
+                         placeholder="Ex: 5000" 
+                         className="bg-zinc-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 shadow-inner"
+                      />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider pl-1">Dia Início Ciclo</label>
+                      <input 
+                         type="number" 
+                         min="1" max="31"
+                         value={tempCycle}
+                         onChange={(e) => setTempCycle(e.target.value)}
+                         className="bg-zinc-950/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 shadow-inner text-center"
+                      />
+                  </div>
               </div>
+              <button 
+                 onClick={async () => {
+                     const incomeVal = parseFloat(tempIncome);
+                     const cycleVal = parseInt(tempCycle);
+                     if (!isNaN(incomeVal)) await setMonthlyIncome(incomeVal);
+                     if (!isNaN(cycleVal)) await setCycleStartDay(cycleVal);
+                     setShowSettings(false);
+                 }}
+                 className="w-full mt-4 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 py-3 rounded-xl text-sm font-bold tracking-widest uppercase hover:bg-emerald-500/30 transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+              >
+                  Sincronizar Protocolo Financeiro
+              </button>
           </div>
       )}
 
@@ -114,14 +150,14 @@ export default function FinanceReport() {
                <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center shadow-inner backdrop-blur-xl">
                    <Wallet className="w-6 h-6 text-zinc-300" />
                </div>
-               <div>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Balanço do Mês</h3>
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1">Disponibilidade Real do Mês</h3>
                   <div className="flex items-baseline gap-2">
-                     <span className={`text-[42px] font-extrabold tracking-tighter leading-none ${monthlyBalance >= 0 ? 'text-transparent bg-clip-text bg-gradient-to-br from-white to-zinc-400 drop-shadow-sm' : 'text-transparent bg-clip-text bg-gradient-to-br from-red-400 to-red-600 drop-shadow-sm'}`}>
-                         R$ {monthlyBalance.toFixed(2)}
+                     <span className={`text-[42px] font-extrabold tracking-tighter leading-none ${availableMonthly >= 0 ? 'text-transparent bg-clip-text bg-gradient-to-br from-white to-zinc-400 drop-shadow-sm' : 'text-transparent bg-clip-text bg-gradient-to-br from-red-400 to-red-600 drop-shadow-sm'}`}>
+                         R$ {availableMonthly.toFixed(2)}
                      </span>
                   </div>
-               </div>
+                </div>
             </div>
          </div>
 
@@ -130,10 +166,10 @@ export default function FinanceReport() {
                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2"><ArrowUpRight className="w-4 h-4 text-emerald-400"/> Receita</div>
                  <div className="font-bold text-lg text-emerald-50 text-shadow-sm">R$ {monthlyIncome.toFixed(2)}</div>
              </div>
-             <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-2xl p-4 shadow-inner backdrop-blur-md">
-                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2"><ArrowDownRight className="w-4 h-4 text-red-400"/> Custo</div>
-                 <div className="font-bold text-lg text-red-50 text-shadow-sm">R$ {monthlySpent.toFixed(2)}</div>
-             </div>
+              <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-2xl p-4 shadow-inner backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2"><ArrowDownRight className="w-4 h-4 text-rose-400"/> Obrigações</div>
+                  <div className="font-bold text-lg text-rose-50 text-shadow-sm">R$ {totalFixed.toFixed(2)}</div>
+              </div>
          </div>
       </div>
 
@@ -143,11 +179,14 @@ export default function FinanceReport() {
               <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
               
               <div className="flex justify-between items-center mb-6 relative z-10">
-                 <h3 className="font-bold text-white text-base flex items-center gap-2.5">
-                    <div className="bg-blue-500/10 p-1.5 rounded-lg border border-blue-500/20"><Target className="w-4 h-4 text-blue-400"/></div>
-                    Controle Diário
-                 </h3>
-                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 border border-white/10 px-2 py-1 rounded-md bg-white/5"> LMT R$ {dailyLimit}</span>
+                  <h3 className="font-bold text-white text-base flex items-center gap-2.5">
+                     <div className="bg-blue-500/10 p-1.5 rounded-lg border border-blue-500/20"><Target className="w-4 h-4 text-blue-400"/></div>
+                     Cota Diária Inteligente
+                  </h3>
+                  <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">LMT R$ {dailyLimit.toFixed(2)}</span>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">{daysLeft} dias rest. • R${availableMonthly.toFixed(0)} total</span>
+                  </div>
               </div>
               
               <div className="flex items-end justify-between mb-4 relative z-10">
@@ -305,7 +344,7 @@ export default function FinanceReport() {
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]"></span> TBrain Neural Core
              </div>
              <p className="text-[13px] text-zinc-300 leading-relaxed font-medium">
-                Sua projeção de obrigações fixas acumula R$ {fixedCosts.reduce((acc, c) => acc + c.installmentAmount, 0).toFixed(2)} por mês. Seu ritmo de gastos diários (R${spentToday.toFixed(0)}/dia) mantém a saúde do LMT em {(100 - (spentToday/dailyLimit)*100).toFixed(0)}%.
+                Sua projeção de obrigações fixas acumula R$ {totalFixed.toFixed(2)} por mês. Com {daysLeft} dias para o fim do ciclo, sua cota diária de R$ {dailyLimit.toFixed(0)} mantém sua disponibilidade real de R$ {availableMonthly.toFixed(0)} protegida.
              </p>
          </div>
       </div>
