@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useFinanceStore } from '../../store';
-import { useAgentStore, useVaultStore, useHabitsStore } from '../../store';
-import { Bell, CreditCard, Layers, Zap, Mic, Globe2, MapPin, Clock, AlertTriangle, Activity } from 'lucide-react';
+import { useAgentStore, useVaultStore, useHabitsStore, useAuthStore } from '../../store';
+import { Bell, CreditCard, Layers, Zap, Globe2, MapPin, Clock, AlertTriangle, Activity } from 'lucide-react';
 import axios from 'axios';
 
 interface NewsItem {
@@ -23,6 +23,8 @@ export default function Dashboard() {
     const [isLoadingNews, setIsLoadingNews] = useState(true);
     const [showNotifications, setShowNotifications] = useState(false);
     const [lastNewsUpdate, setLastNewsUpdate] = useState<Date | null>(null);
+    const { user } = useAuthStore();
+    const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Doador';
 
     const fetchLatestNews = () => {
         axios.get(`/api/news?t=${Date.now()}`).then(res => {
@@ -61,9 +63,9 @@ export default function Dashboard() {
                     <img src="/tbrain-logo.png" alt="TBrain" className="w-10 h-10 rounded-xl shadow-[0_0_15px_rgba(56,189,248,0.3)]" />
                     <div>
                        <h1 className="text-2xl font-bold text-white tracking-tight">
-                           {greeting}, Eduardo
+                           {greeting}, {userName}
                        </h1>
-                       <p className="text-zinc-500 text-sm font-medium mt-0.5 animate-pulse text-cyan-400">TBrain - Central de Inteligência</p>
+                       <p className="text-zinc-500 text-sm font-medium mt-0.5 text-cyan-400/80">Central de Inteligência TBrain</p>
                     </div>
                 </div>
                 <div className="relative">
@@ -88,19 +90,6 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* AI Active Status Banner */}
-            {isConnected && (
-                <div className="glass-panel border-tscript-accent/30 p-4 rounded-3xl flex items-center justify-between animate-in fade-in slide-in-from-top-2 mb-6">
-                    <div className="flex items-center gap-4">
-                       <div className="relative flex items-center justify-center">
-                          <div className="absolute inset-0 bg-cyan-400 rounded-full blur-[10px] animate-pulse opacity-60"></div>
-                          <div className="w-3 h-3 rounded-full bg-cyan-400 relative z-10 shadow-[0_0_15px_rgba(56,189,248,0.8)]" />
-                       </div>
-                       <span className="text-sm font-semibold text-cyan-50 tracking-widest uppercase">TBrain Neural Core Active</span>
-                    </div>
-                    <div className="text-[10px] text-cyan-400/50 font-mono">REC: 16Khz</div>
-                </div>
-            )}
 
             {/* Daily Briefing / Resumo Inteligente */}
             <div className="glass-panel rounded-[2rem] p-6 mb-2 border-t border-white/5 relative overflow-hidden flex flex-col gap-3 shadow-lg bg-black/20">

@@ -29,6 +29,13 @@ export interface FixedCost {
     dueDate: number; // Day of the month
 }
 
+export interface Transaction {
+    id: string;
+    amount: number;
+    type: 'income' | 'expense';
+    createdAt: number;
+}
+
 interface FinanceState {
     dailyLimit: number;
     spentToday: number;
@@ -36,8 +43,10 @@ interface FinanceState {
     monthlySpent: number;
     currency: string;
     fixedCosts: FixedCost[];
+    transactions: Transaction[];
     updateSpending: (amount: number) => void;
     addTransaction: (amount: number, type: 'income' | 'expense') => void;
+    deleteTransaction: (id: string) => void;
     setMonthlyIncome: (amount: number) => void;
     addFixedCost: (cost: Omit<FixedCost, 'id'>) => void;
     deleteFixedCost: (id: string) => void;
@@ -56,19 +65,43 @@ export const useFinanceStore = create<FinanceState>()(
             { id: 'mock1', name: 'Notebook Pro', totalAmount: 5000, installmentAmount: 500, totalInstallments: 10, paidInstallments: 3, dueDate: 5 },
             { id: 'mock2', name: 'Assinatura TBrain', totalAmount: 120, installmentAmount: 120, totalInstallments: 1, paidInstallments: 0, dueDate: 10 }
         ],
+        transactions: [],
         updateSpending: (amount) => set((state) => ({ 
             spentToday: state.spentToday + amount,
             monthlySpent: state.monthlySpent + amount
         })),
         addTransaction: (amount, type) => set((state) => {
+            const newTransaction: Transaction = {
+                id: Math.random().toString(36).substring(7),
+                amount,
+                type,
+                createdAt: Date.now()
+            };
+            
             if (type === 'income') {
-                return { monthlyIncome: state.monthlyIncome + amount };
+                return { 
+                    monthlyIncome: state.monthlyIncome + amount,
+                    transactions: [newTransaction, ...state.transactions]
+                };
             } else {
                 return { 
                     spentToday: state.spentToday + amount, 
-                    monthlySpent: state.monthlySpent + amount 
+                    monthlySpent: state.monthlySpent + amount,
+                    transactions: [newTransaction, ...state.transactions]
                 };
             }
+        }),
+        deleteTransaction: (id) => set((state) => {
+            const transaction = state.transactions.find(t => t.id === id);
+            if (!transaction) return state;
+
+            const isIncome = transaction.type === 'income';
+            return {
+                transactions: state.transactions.filter(t => t.id !== id),
+                monthlyIncome: isIncome ? state.monthlyIncome - transaction.amount : state.monthlyIncome,
+                spentToday: !isIncome ? state.spentToday - transaction.amount : state.spentToday,
+                monthlySpent: !isIncome ? state.monthlySpent - transaction.amount : state.monthlySpent
+            };
         }),
         setMonthlyIncome: (amount) => set({ monthlyIncome: amount }),
         addFixedCost: (cost) => set((state) => ({

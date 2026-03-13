@@ -21,7 +21,7 @@ const mockDailyData = [
 ];
 
 export default function FinanceReport() {
-  const { spentToday, dailyLimit, monthlyIncome, monthlySpent, addTransaction, setMonthlyIncome, fixedCosts, addFixedCost, deleteFixedCost } = useFinanceStore();
+  const { spentToday, dailyLimit, monthlyIncome, monthlySpent, addTransaction, deleteTransaction, setMonthlyIncome, fixedCosts, addFixedCost, deleteFixedCost, transactions } = useFinanceStore();
   const [activeTab, setActiveTab] = useState('overview');
   
   const [amountInput, setAmountInput] = useState('');
@@ -245,7 +245,48 @@ export default function FinanceReport() {
                   ))}
                   {fixedCosts.length === 0 && (
                       <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 text-center">
-                          <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Aba de Custos Fixos em Liso.</p>
+                          <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Nenhuma conta fixa registrada.</p>
+                      </div>
+                  )}
+              </div>
+          </div>
+
+          {/* Transactions List */}
+          <div className="glass-panel rounded-[2rem] p-6 shadow-md border-t border-white/5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
+              
+              <div className="flex justify-between items-center mb-6 relative z-10">
+                 <h3 className="font-bold text-white text-base flex items-center gap-2.5">
+                    <div className="bg-blue-500/10 p-1.5 rounded-lg border border-blue-500/20"><Activity className="w-4 h-4 text-blue-400"/></div>
+                    Histórico de Lançamentos
+                 </h3>
+              </div>
+
+              <div className="space-y-3 relative z-10">
+                  {transactions.slice(0, 15).map(t => (
+                      <div key={t.id} className="glass-panel p-4 rounded-xl border border-white/5 hover:bg-white/[0.03] transition-colors flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${t.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                                  {t.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                              </div>
+                              <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-zinc-200">{t.type === 'income' ? 'Receita Extra' : 'Despesa Variável'}</span>
+                                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(t.createdAt).toLocaleDateString()}</span>
+                              </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <span className={`text-sm font-black ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {t.type === 'income' ? '+' : '-'} R$ {t.amount.toFixed(2)}
+                              </span>
+                              <button onClick={() => deleteTransaction(t.id)} className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                      </div>
+                  ))}
+                  {transactions.length === 0 && (
+                      <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 text-center">
+                          <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Nenhum lançamento hoje.</p>
                       </div>
                   )}
               </div>
