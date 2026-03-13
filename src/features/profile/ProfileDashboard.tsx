@@ -3,18 +3,34 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { User, Shield, Settings, LogOut, ChevronRight, Briefcase, Target, Activity, Key, Brain, Sun, Moon } from 'lucide-react';
-import { useProfileStore, useThemeStore } from '../../store';
+import { useProfileStore, useThemeStore, useAuthStore } from '../../store';
+import { createClient } from '../../utils/supabase/client';
 
 const PerformanceReport = dynamic(() => import('./PerformanceReport'), { ssr: false });
 
 export default function ProfileDashboard() {
   const { traits, updateTraits } = useProfileStore();
+  const { user, login } = useAuthStore();
+  const supabase = createClient();
 
   const [activeSegment, setActiveSegment] = useState<'menu' | 'traits'>('menu');
   const [localTraits, setLocalTraits] = useState(traits);
+  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '');
 
-  const handleSaveTraits = () => {
+  const handleSaveTraits = async () => {
+      // Update local store traits
       updateTraits(localTraits);
+
+      // Update Supabase metadata for full_name
+      const { data, error } = await supabase.auth.updateUser({
+          data: { full_name: fullName }
+      });
+
+      if (!error && data.user) {
+          // Re-sync local auth state if necessary, though useAuthStore usually handles it on session change or re-login
+          // For now, let's just update the local name if we want immediate feedback
+      }
+
       setActiveSegment('menu');
   };
 
@@ -29,11 +45,17 @@ export default function ProfileDashboard() {
              </div>
 
              <div className="space-y-4">
-                 <div className="glass-panel p-5 rounded-3xl bg-black/40 border border-white/5 relative overflow-hidden">
-                     <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent pointer-events-none"></div>
-                     <label className="text-[11px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2 mb-3 relative z-10"><Briefcase className="w-4 h-4"/> Atuação Profissional</label>
-                     <input value={localTraits.profession} onChange={e => setLocalTraits({...localTraits, profession: e.target.value})} className="w-full bg-zinc-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500/50 shadow-inner relative z-10" />
-                 </div>
+                  <div className="glass-panel p-5 rounded-3xl bg-black/40 border border-white/5 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent pointer-events-none"></div>
+                      <label className="text-[11px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2 mb-3 relative z-10"><User className="w-4 h-4"/> Identidade Neural (Nome)</label>
+                      <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Como o TBrain deve te chamar?" className="w-full bg-zinc-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500/50 shadow-inner relative z-10" />
+                  </div>
+
+                  <div className="glass-panel p-5 rounded-3xl bg-black/40 border border-white/5 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent pointer-events-none"></div>
+                      <label className="text-[11px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2 mb-3 relative z-10"><Briefcase className="w-4 h-4"/> Atuação Profissional</label>
+                      <input value={localTraits.profession} onChange={e => setLocalTraits({...localTraits, profession: e.target.value})} className="w-full bg-zinc-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500/50 shadow-inner relative z-10" />
+                  </div>
 
                  <div className="glass-panel p-5 rounded-3xl bg-black/40 border border-white/5 relative overflow-hidden">
                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent pointer-events-none"></div>
@@ -83,7 +105,7 @@ export default function ProfileDashboard() {
           </div>
           
           <div className="flex flex-col relative z-10">
-              <span className="text-xl font-bold text-white tracking-tight">Eduardo Teti</span>
+              <span className="text-xl font-bold text-white tracking-tight">{fullName || 'Doador'}</span>
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1 mt-1">
                  <Shield className="w-3 h-3" /> Administrador Nível 1
               </span>
