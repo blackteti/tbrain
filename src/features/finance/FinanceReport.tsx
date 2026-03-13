@@ -26,6 +26,7 @@ export default function FinanceReport() {
   
   const [amountInput, setAmountInput] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [tempIncome, setTempIncome] = useState(monthlyIncome.toString());
   const [tempCycle, setTempCycle] = useState(cycleStartDay.toString());
 
@@ -126,16 +127,37 @@ export default function FinanceReport() {
                   </div>
               </div>
               <button 
+                 disabled={isSyncing}
                  onClick={async () => {
                      const incomeVal = parseFloat(tempIncome);
                      const cycleVal = parseInt(tempCycle);
-                     if (!isNaN(incomeVal)) await setMonthlyIncome(incomeVal);
-                     if (!isNaN(cycleVal)) await setCycleStartDay(cycleVal);
-                     setShowSettings(false);
+                     
+                     if (isNaN(incomeVal) || isNaN(cycleVal)) {
+                         alert('Por favor, insira valores válidos.');
+                         return;
+                     }
+
+                     setIsSyncing(true);
+                     try {
+                         await setMonthlyIncome(incomeVal);
+                         await setCycleStartDay(cycleVal);
+                         setShowSettings(false);
+                         alert('Dados sincronizados com sucesso! ✨');
+                     } catch (err) {
+                         console.error(err);
+                         alert('Erro ao sincronizar. Verifique se as tabelas do Supabase foram criadas.');
+                     } finally {
+                         setIsSyncing(false);
+                     }
                  }}
-                 className="w-full mt-4 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 py-3 rounded-xl text-sm font-bold tracking-widest uppercase hover:bg-emerald-500/30 transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                 className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)] ${isSyncing ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'}`}
               >
-                  Sincronizar Protocolo Financeiro
+                  {isSyncing ? (
+                      <>
+                          <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin"></div>
+                          Sincronizando...
+                      </>
+                  ) : 'Sincronizar Protocolo Financeiro'}
               </button>
           </div>
       )}

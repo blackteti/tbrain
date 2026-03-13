@@ -71,38 +71,42 @@ export const useFinanceStore = create<FinanceState>()(
         fixedCosts: [],
         transactions: [],
         fetchFinance: async () => {
-            const { data: txData } = await supabase.from('transacoes').select('*').order('criado_em', { ascending: false });
-            const { data: configData } = await supabase.from('usuario_config').select('*').single();
-            const { data: costsData } = await supabase.from('custos_fixos').select('*');
+            try {
+                const { data: txData } = await supabase.from('transacoes').select('*').order('criado_em', { ascending: false });
+                const { data: configData } = await supabase.from('usuario_config').select('*').maybeSingle();
+                const { data: costsData } = await supabase.from('custos_fixos').select('*');
 
-            let income = 0;
-            let cycleDay = 5;
-            let costs: FixedCost[] = [];
+                let income = 0;
+                let cycleDay = 5;
+                let costs: FixedCost[] = [];
 
-            if (configData) {
-                income = Number(configData.renda_mensal);
-                cycleDay = configData.dia_inicio_ciclo;
-            }
+                if (configData) {
+                    income = Number(configData.renda_mensal);
+                    cycleDay = configData.dia_inicio_ciclo;
+                }
 
-            if (costsData) {
-                costs = costsData.map(c => ({
-                    id: c.id,
-                    name: c.nome,
-                    totalAmount: Number(c.valor_total),
-                    installmentAmount: Number(c.valor_parcela),
-                    totalInstallments: c.parcelas_totais,
-                    paidInstallments: c.parcelas_pagas,
-                    dueDate: c.vencimento
-                }));
-            }
+                if (costsData) {
+                    costs = costsData.map(c => ({
+                        id: c.id,
+                        name: c.nome,
+                        totalAmount: Number(c.valor_total),
+                        installmentAmount: Number(c.valor_parcela),
+                        totalInstallments: c.parcelas_totais,
+                        paidInstallments: c.parcelas_pagas,
+                        dueDate: c.vencimento
+                    }));
+                }
 
-            if (txData) {
-                const txs: Transaction[] = txData.map(d => ({
-                    id: d.id,
-                    amount: Number(d.valor),
-                    type: (d.tipo === 'INCOME' ? 'income' : 'expense') as 'income' | 'expense',
-                    createdAt: new Date(d.criado_em).getTime()
-                }));
+                let txs: Transaction[] = [];
+                if (txData) {
+                    txs = txData.map(d => ({
+                        id: d.id,
+                        amount: Number(d.valor),
+                        type: (d.tipo === 'INCOME' ? 'income' : 'expense') as 'income' | 'expense',
+                        createdAt: new Date(d.criado_em).getTime()
+                    }));
+                }
+
                 // Calculate today's spend
                 const startOfDay = new Date();
                 startOfDay.setHours(0, 0, 0, 0);
@@ -138,6 +142,8 @@ export const useFinanceStore = create<FinanceState>()(
                     fixedCosts: costs,
                     dailyLimit: calculatedLimit
                 });
+            } catch (err) {
+                console.error('Erro ao buscar dados financeiros:', err);
             }
         },
         updateSpending: (amount) => set((state) => ({ 
@@ -212,6 +218,7 @@ export const useFinanceStore = create<FinanceState>()(
                 await get().fetchFinance();
             } catch (err) {
                 console.error('Erro ao salvar renda:', err);
+                throw err;
             }
         },
         setCycleStartDay: async (day) => {
@@ -226,6 +233,7 @@ export const useFinanceStore = create<FinanceState>()(
                 await get().fetchFinance();
             } catch (err) {
                 console.error('Erro ao salvar ciclo:', err);
+                throw err;
             }
         },
         addFixedCost: async (cost) => {
