@@ -1,26 +1,157 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-primary: #3B82F6;
+  --color-primary-hover: #2563EB;
+  --color-secondary: #050505;
+  /* Deeper black for spatial depth */
+
+  --color-glass-base: rgba(15, 15, 15, 0.4);
+  --color-glass-border: rgba(255, 255, 255, 0.03);
+  --color-glass-light: rgba(255, 255, 255, 0.05);
+
+  --color-accent-tscript: #38bdf8;
+  /* TScript signature cyan/blue */
+
+  --color-finance-income: #10b981;
+  --color-finance-expense: #ef4444;
+
+  /* Intense Spatial Shadows */
+  --shadow-spatial-outer: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-spatial-inner: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  --shadow-glow-tscript: 0 0 25px rgba(56, 189, 248, 0.15);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background-color: var(--color-secondary);
+    background-image:
+      radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.04), transparent 40%),
+      radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.03), transparent 40%);
+    background-attachment: fixed;
+    color: #f8fafc;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .glass-panel {
+    background-color: var(--color-glass-base);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--color-glass-border);
+    box-shadow: var(--shadow-spatial-outer), var(--shadow-spatial-inner);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Spatial Hover Depth */
+  .glass-panel:hover {
+    box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .glass-button {
+    background-color: var(--color-glass-light);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-glass-border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-button:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Light Theme Overrides */
+body.theme-light {
+  background-color: #f0f2f5 !important;
+  background-image:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.08), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(56, 189, 248, 0.06), transparent 40%) !important;
+  color: #111827 !important;
+}
+
+body.theme-light .glass-panel {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+body.theme-light .glass-panel:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Text colors — much darker for legibility */
+body.theme-light .text-white {
+  color: #111827 !important;
+}
+
+body.theme-light .text-zinc-100 {
+  color: #1f2937 !important;
+}
+
+body.theme-light .text-zinc-200 {
+  color: #1f2937 !important;
+}
+
+body.theme-light .text-zinc-300 {
+  color: #374151 !important;
+}
+
+body.theme-light .text-zinc-400 {
+  color: #4b5563 !important;
+}
+
+body.theme-light .text-zinc-500 {
+  color: #6b7280 !important;
+}
+
+body.theme-light .text-zinc-600 {
+  color: #9ca3af !important;
+}
+
+/* Backgrounds */
+body.theme-light .bg-zinc-950 {
+  background-color: #f0f2f5 !important;
+}
+
+body.theme-light .bg-zinc-950\/80 {
+  background-color: rgba(240, 242, 245, 0.95) !important;
+}
+
+body.theme-light .bg-black\/40,
+body.theme-light .bg-black\/50,
+body.theme-light .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Borders */
+body.theme-light .border-white\/5,
+body.theme-light .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.theme-light .border-t.border-white\/5 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Inputs */
+body.theme-light input,
+body.theme-light select,
+body.theme-light textarea {
+  color: #111827 !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.theme-light input::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Bottom Nav */
+body.theme-light nav.fixed {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
 }
