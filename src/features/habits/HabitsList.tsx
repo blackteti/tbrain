@@ -14,8 +14,8 @@ export default function HabitsList() {
   const [activeTab, setActiveTab] = useState<'DAILY' | 'LONG_TERM'>('DAILY');
   const [newDeadline, setNewDeadline] = useState('');
 
-  const handleToggle = async (id: number) => {
-      const justCompleted = toggleHabit(id);
+  const handleToggle = async (id: number | string) => {
+      const justCompleted = await toggleHabit(id);
       if (justCompleted) {
           // Lazy loading canvas-confetti to drop heavy dependency from initial load
           const confetti = (await import('canvas-confetti')).default;

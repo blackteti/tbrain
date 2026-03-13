@@ -1,8 +1,10 @@
 "use client";
 
 import dynamic from 'next/dynamic';
+import React, { useEffect } from 'react';
 import BottomNav from "@/components/BottomNav";
-import { useAgentStore } from "@/store";
+import { useAgentStore, useHabitsStore, useVaultStore, useFinanceStore } from "@/store";
+import { createClient } from '@/utils/supabase/client';
 
 const Dashboard = dynamic(() => import('@/features/dashboard/Dashboard'), { 
     ssr: false, 
@@ -34,6 +36,26 @@ const HabitTracker = dynamic(() => import('@/features/tracker/HabitTracker'), {
 
 export default function Home() {
   const { currentRoute } = useAgentStore();
+  const { fetchHabits } = useHabitsStore();
+  const { fetchItems } = useVaultStore();
+  const { fetchFinance } = useFinanceStore();
+
+  useEffect(() => {
+    // Sincronizar dados do Supabase ao iniciar
+    const syncData = async () => {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+            console.log('Sincronizando dados para o usuário:', session.user.email);
+            fetchHabits();
+            fetchItems();
+            fetchFinance();
+        }
+    };
+
+    syncData();
+  }, [fetchHabits, fetchItems, fetchFinance]);
 
   return (
     <>

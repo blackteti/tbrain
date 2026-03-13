@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createClient } from '../utils/supabase/client';
+
+const supabase = createClient();
 
 interface AgentState {
     isConnected: boolean;
@@ -44,9 +47,10 @@ interface FinanceState {
     currency: string;
     fixedCosts: FixedCost[];
     transactions: Transaction[];
+    fetchFinance: () => Promise<void>;
     updateSpending: (amount: number) => void;
-    addTransaction: (amount: number, type: 'income' | 'expense') => void;
-    deleteTransaction: (id: string) => void;
+    addTransaction: (amount: number, type: 'income' | 'expense') => Promise<void>;
+    deleteTransaction: (id: string) => Promise<void>;
     setMonthlyIncome: (amount: number) => void;
     addFixedCost: (cost: Omit<FixedCost, 'id'>) => void;
     deleteFixedCost: (id: string) => void;
@@ -55,7 +59,7 @@ interface FinanceState {
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
         dailyLimit: 150,
         spentToday: 0,
         monthlyIncome: 0,
@@ -66,43 +70,85 @@ export const useFinanceStore = create<FinanceState>()(
             { id: 'mock2', name: 'Assinatura TBrain', totalAmount: 120, installmentAmount: 120, totalInstallments: 1, paidInstallments: 0, dueDate: 10 }
         ],
         transactions: [],
+        fetchFinance: async () => {
+            const { data } = await supabase.from('transacoes').select('*').order('criado_em', { ascending: false });
+            if (data) {
+                const txs: Transaction[] = data.map(d => ({
+                    id: d.id,
+                    amount: Number(d.valor),
+                    type: (d.tipo === 'INCOME' ? 'income' : 'expense') as 'income' | 'expense',
+                    createdAt: new Date(d.criado_em).getTime()
+                }));
+                // Calculate today's spend
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+                const todaySpend = txs
+                    .filter(t => t.type === 'expense' && t.createdAt >= startOfDay.getTime())
+                    .reduce((acc, t) => acc + t.amount, 0);
+
+                set({ transactions: txs, spentToday: todaySpend });
+            }
+        },
         updateSpending: (amount) => set((state) => ({ 
             spentToday: state.spentToday + amount,
             monthlySpent: state.monthlySpent + amount
         })),
-        addTransaction: (amount, type) => set((state) => {
-            const newTransaction: Transaction = {
-                id: Math.random().toString(36).substring(7),
-                amount,
-                type,
-                createdAt: Date.now()
-            };
-            
-            if (type === 'income') {
-                return { 
-                    monthlyIncome: state.monthlyIncome + amount,
-                    transactions: [newTransaction, ...state.transactions]
-                };
-            } else {
-                return { 
-                    spentToday: state.spentToday + amount, 
-                    monthlySpent: state.monthlySpent + amount,
-                    transactions: [newTransaction, ...state.transactions]
-                };
-            }
-        }),
-        deleteTransaction: (id) => set((state) => {
-            const transaction = state.transactions.find(t => t.id === id);
-            if (!transaction) return state;
+        addTransaction: async (amount, type) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
 
-            const isIncome = transaction.type === 'income';
-            return {
-                transactions: state.transactions.filter(t => t.id !== id),
-                monthlyIncome: isIncome ? state.monthlyIncome - transaction.amount : state.monthlyIncome,
-                spentToday: !isIncome ? state.spentToday - transaction.amount : state.spentToday,
-                monthlySpent: !isIncome ? state.monthlySpent - transaction.amount : state.monthlySpent
-            };
-        }),
+            const { data, error } = await supabase.from('transacoes').insert({
+                user_id: user.id,
+                valor: amount,
+                tipo: type === 'income' ? 'INCOME' : 'EXPENSE'
+            }).select().single();
+
+            if (error) console.error('Erro ao salvar transação:', error);
+
+            if (data) {
+                set((state) => {
+                    const newTransaction: Transaction = {
+                        id: data.id,
+                        amount: Number(data.valor),
+                        type: data.tipo === 'INCOME' ? 'income' : 'expense',
+                        createdAt: new Date(data.criado_em).getTime()
+                    };
+                    
+                    if (type === 'income') {
+                        return { 
+                            monthlyIncome: state.monthlyIncome + amount,
+                            transactions: [newTransaction, ...state.transactions]
+                        };
+                    } else {
+                        return { 
+                            spentToday: state.spentToday + amount, 
+                            monthlySpent: state.monthlySpent + amount,
+                            transactions: [newTransaction, ...state.transactions]
+                        };
+                    }
+                });
+            }
+        },
+        deleteTransaction: async (id) => {
+            const { error } = await supabase.from('transacoes').delete().eq('id', id);
+            if (error) {
+                console.error('Erro ao deletar transação:', error);
+                return;
+            }
+
+            set((state) => {
+                const transaction = state.transactions.find(t => t.id === id);
+                if (!transaction) return state;
+
+                const isIncome = transaction.type === 'income';
+                return {
+                    transactions: state.transactions.filter(t => t.id !== id),
+                    monthlyIncome: isIncome ? state.monthlyIncome - transaction.amount : state.monthlyIncome,
+                    spentToday: !isIncome ? state.spentToday - transaction.amount : state.spentToday,
+                    monthlySpent: !isIncome ? state.monthlySpent - transaction.amount : state.monthlySpent
+                };
+            });
+        },
         setMonthlyIncome: (amount) => set({ monthlyIncome: amount }),
         addFixedCost: (cost) => set((state) => ({
             fixedCosts: [...state.fixedCosts, { ...cost, id: Math.random().toString(36).substring(7) }]
@@ -134,36 +180,71 @@ export interface Habit {
 
 interface HabitState {
     habits: Habit[];
-    addHabit: (name: string, type: 'DAILY' | 'WEEKLY' | 'MONTHLY', urgency: 'HIGH' | 'NORMAL', deadline?: string) => void;
-    deleteHabit: (id: number) => void;
-    toggleHabit: (id: number) => boolean;
+    fetchHabits: () => Promise<void>;
+    addHabit: (name: string, type: 'DAILY' | 'WEEKLY' | 'MONTHLY', urgency: 'HIGH' | 'NORMAL', deadline?: string) => Promise<void>;
+    deleteHabit: (id: number | string) => Promise<void>;
+    toggleHabit: (id: number | string) => Promise<boolean>;
 }
 
 export const useHabitsStore = create<HabitState>()(
   persist(
     (set, get) => ({
-        habits: [
-            { id: 1, name: 'Meditação 10 Minutos', streak: 4, completed: false, type: 'DAILY', urgency: 'NORMAL' },
-            { id: 2, name: 'Ler 20 páginas', streak: 12, completed: true, type: 'DAILY', urgency: 'NORMAL' },
-            { id: 3, name: 'Revisar TScript Logs', streak: 0, completed: false, type: 'WEEKLY', urgency: 'HIGH' },
-        ],
-        addHabit: (name, type, urgency, deadline) => set((state) => ({
-            habits: [...state.habits, { id: Date.now(), name, type, urgency, deadline, streak: 0, completed: false }]
-        })),
-        deleteHabit: (id) => set((state) => ({
-            habits: state.habits.filter(h => h.id !== id)
-        })),
-        toggleHabit: (id) => {
+        habits: [],
+        fetchHabits: async () => {
+            const { data } = await supabase.from('habitos').select('*');
+            if (data) {
+                set({ habits: data.map(d => ({
+                    id: d.id,
+                    name: d.nome,
+                    type: d.frequencia as any,
+                    urgency: d.urgencia as any,
+                    completed: d.concluido_hoje,
+                    streak: 0 // TODO: logic for streaks
+                })) });
+            }
+        },
+        addHabit: async (name, type, urgency, deadline) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data } = await supabase.from('habitos').insert({
+                user_id: user.id,
+                nome: name,
+                frequencia: type,
+                urgencia: urgency
+            }).select().single();
+
+            if (data) {
+                set((state) => ({
+                    habits: [...state.habits, { id: data.id, name, type, urgency, deadline, streak: 0, completed: false }]
+                }));
+            }
+        },
+        deleteHabit: async (id) => {
+            await supabase.from('habitos').delete().eq('id', id);
+            set((state) => ({
+                habits: state.habits.filter(h => h.id !== id)
+            }));
+        },
+        toggleHabit: async (id) => {
+            const habit = get().habits.find(h => h.id === id);
+            if (!habit) return false;
+
+            const newStatus = !habit.completed;
+            const { error } = await supabase.from('habitos').update({ concluido_hoje: newStatus }).eq('id', id);
+            
+            if (error) return false;
+
             let justCompleted = false;
             set((state) => ({
                 habits: state.habits.map(habit => {
                     if (habit.id === id) {
-                        const isNowCompleted = !habit.completed;
+                        const isNowCompleted = newStatus;
                         if (isNowCompleted) justCompleted = true;
                         return {
                             ...habit,
                             completed: isNowCompleted,
-                            streak: isNowCompleted ? habit.streak + 1 : habit.streak - 1
+                            streak: isNowCompleted ? habit.streak + 1 : Math.max(0, habit.streak - 1)
                         };
                     }
                     return habit;
@@ -249,36 +330,80 @@ export interface VaultItem {
 
 interface VaultState {
     items: VaultItem[];
-    addItem: (content: string, type: 'NOTE' | 'LINK' | 'REMINDER', title?: string, weekday?: number) => void;
-    toggleItem: (id: string) => void;
-    deleteItem: (id: string) => void;
-    updateItemDay: (id: string, weekday: number) => void;
+    fetchItems: () => Promise<void>;
+    addItem: (content: string, type: 'NOTE' | 'LINK' | 'REMINDER', title?: string, weekday?: number) => Promise<void>;
+    toggleItem: (id: string) => Promise<void>;
+    deleteItem: (id: string) => Promise<void>;
+    updateItemDay: (id: string, weekday: number) => Promise<void>;
 }
 
 export const useVaultStore = create<VaultState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
         items: [],
-        addItem: (content, type, title, weekday) => set((state) => ({
-            items: [{
-                id: Math.random().toString(36).substring(7),
-                title: title || '',
-                content,
-                type,
-                createdAt: Date.now(),
-                completed: false,
-                weekday: weekday !== undefined ? weekday : undefined
-            }, ...state.items]
-        })),
-        toggleItem: (id) => set((state) => ({
-            items: state.items.map(item => item.id === id ? { ...item, completed: !item.completed } : item)
-        })),
-        deleteItem: (id) => set((state) => ({
-            items: state.items.filter(item => item.id !== id)
-        })),
-        updateItemDay: (id, weekday) => set((state) => ({
-            items: state.items.map(item => item.id === id ? { ...item, weekday } : item)
-        }))
+        fetchItems: async () => {
+            const { data } = await supabase.from('cofre_neural').select('*').order('criado_em', { ascending: false });
+            if (data) {
+                set({ items: data.map(d => ({
+                    id: d.id,
+                    title: d.titulo,
+                    content: d.conteudo,
+                    type: d.tipo as any,
+                    createdAt: new Date(d.criado_em).getTime(),
+                    completed: d.concluido,
+                    weekday: d.dia_semana
+                })) });
+            }
+        },
+        addItem: async (content, type, title, weekday) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data } = await supabase.from('cofre_neural').insert({
+                user_id: user.id,
+                tipo: type,
+                titulo: title,
+                conteudo: content,
+                dia_semana: weekday
+            }).select().single();
+
+            if (data) {
+                set((state) => ({
+                    items: [{
+                        id: data.id,
+                        title: data.titulo || '',
+                        content: data.conteudo,
+                        type: data.tipo as any,
+                        createdAt: new Date(data.criado_em).getTime(),
+                        completed: data.concluido,
+                        weekday: data.dia_semana !== null ? data.dia_semana : undefined
+                    }, ...state.items]
+                }));
+            }
+        },
+        toggleItem: async (id) => {
+            const item = get().items.find(i => i.id === id);
+            if (!item) return;
+
+            const newStatus = !item.completed;
+            await supabase.from('cofre_neural').update({ concluido: newStatus }).eq('id', id);
+
+            set((state) => ({
+                items: state.items.map(item => item.id === id ? { ...item, completed: newStatus } : item)
+            }));
+        },
+        deleteItem: async (id) => {
+            await supabase.from('cofre_neural').delete().eq('id', id);
+            set((state) => ({
+                items: state.items.filter(item => item.id !== id)
+            }));
+        },
+        updateItemDay: async (id, weekday) => {
+            await supabase.from('cofre_neural').update({ dia_semana: weekday }).eq('id', id);
+            set((state) => ({
+                items: state.items.map(item => item.id === id ? { ...item, weekday } : item)
+            }));
+        }
     }),
     { name: 'tscript-vault-storage' }
   )
