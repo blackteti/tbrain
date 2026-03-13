@@ -201,35 +201,62 @@ export const useFinanceStore = create<FinanceState>()(
             });
         },
         setMonthlyIncome: async (amount) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            await supabase.from('usuario_config').upsert({ user_id: user.id, renda_mensal: amount });
-            get().fetchFinance();
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Não autenticado');
+                
+                const { error } = await supabase.from('usuario_config')
+                    .upsert({ user_id: user.id, renda_mensal: amount }, { onConflict: 'user_id' });
+                
+                if (error) throw error;
+                await get().fetchFinance();
+            } catch (err) {
+                console.error('Erro ao salvar renda:', err);
+            }
         },
         setCycleStartDay: async (day) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            await supabase.from('usuario_config').upsert({ user_id: user.id, dia_inicio_ciclo: day });
-            get().fetchFinance();
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Não autenticado');
+                
+                const { error } = await supabase.from('usuario_config')
+                    .upsert({ user_id: user.id, dia_inicio_ciclo: day }, { onConflict: 'user_id' });
+                
+                if (error) throw error;
+                await get().fetchFinance();
+            } catch (err) {
+                console.error('Erro ao salvar ciclo:', err);
+            }
         },
         addFixedCost: async (cost) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            
-            await supabase.from('custos_fixos').insert({
-                user_id: user.id,
-                nome: cost.name,
-                valor_total: cost.totalAmount,
-                valor_parcela: cost.installmentAmount,
-                parcelas_totais: cost.totalInstallments,
-                parcelas_pagas: cost.paidInstallments,
-                vencimento: cost.dueDate
-            });
-            get().fetchFinance();
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Não autenticado');
+                
+                const { error } = await supabase.from('custos_fixos').insert({
+                    user_id: user.id,
+                    nome: cost.name,
+                    valor_total: cost.totalAmount,
+                    valor_parcela: cost.installmentAmount,
+                    parcelas_totais: cost.totalInstallments,
+                    parcelas_pagas: cost.paidInstallments,
+                    vencimento: cost.dueDate
+                });
+                
+                if (error) throw error;
+                await get().fetchFinance();
+            } catch (err) {
+                console.error('Erro ao adicionar custo fixo:', err);
+            }
         },
         deleteFixedCost: async (id) => {
-            await supabase.from('custos_fixos').delete().eq('id', id);
-            get().fetchFinance();
+            try {
+                const { error } = await supabase.from('custos_fixos').delete().eq('id', id);
+                if (error) throw error;
+                await get().fetchFinance();
+            } catch (err) {
+                console.error('Erro ao deletar custo fixo:', err);
+            }
         },
         payInstallment: (id) => set((state) => ({
             fixedCosts: state.fixedCosts.map(cost => 
