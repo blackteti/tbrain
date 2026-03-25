@@ -117,12 +117,59 @@ export const initDb = async () => {
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // Workout Module - Gym Tracking
+        dbInstance.run(`
+            CREATE TABLE Workout_Routines (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL, -- e.g., 'A', 'B', 'C'
+                description TEXT, -- e.g., 'Peito, Ombro e Tríceps'
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        dbInstance.run(`
+            CREATE TABLE Workout_Exercises (
+                id TEXT PRIMARY KEY,
+                routine_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                muscle_group TEXT,
+                order_index INTEGER DEFAULT 0
+            );
+        `);
+
+        dbInstance.run(`
+            CREATE TABLE Workout_Sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                routine_id TEXT,
+                session_date DATETIME DEFAULT CURRENT_DATE,
+                completed BOOLEAN DEFAULT 0,
+                notes TEXT
+            );
+        `);
+
+        dbInstance.run(`
+            CREATE TABLE Workout_Logs (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                exercise_name TEXT NOT NULL, -- Storing name for easier history queries
+                sets INTEGER NOT NULL,
+                reps INTEGER NOT NULL,
+                weight REAL NOT NULL, -- in KG
+                ai_feedback TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
         
         // Performance Optimizer: SQLite Indexing (B-Trees)
         dbInstance.run(`
             CREATE INDEX idx_transactions_user_date ON Financial_Transactions(user_id, date);
             CREATE INDEX idx_memories_search ON Memories(user_id, scope);
             CREATE INDEX idx_telemetry_time ON Telemetry_Health_IoT(user_id, metric_type);
+            CREATE INDEX idx_workout_history ON Workout_Logs(exercise_name);
+            CREATE INDEX idx_workout_sessions ON Workout_Sessions(user_id, session_date);
         `);
 
         saveDb();

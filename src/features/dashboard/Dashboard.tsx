@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useFinanceStore } from '../../store';
 import { useAgentStore, useVaultStore, useHabitsStore, useAuthStore } from '../../store';
-import { Bell, CreditCard, Layers, Zap, Globe2, MapPin, Clock, AlertTriangle, Activity } from 'lucide-react';
+import { Bell, CreditCard, Layers, Zap, Globe2, MapPin, Clock, AlertTriangle, Activity, Dumbbell } from 'lucide-react';
 import axios from 'axios';
 
 interface NewsItem {
@@ -210,6 +210,26 @@ export default function Dashboard() {
                    </h4>
                </button>
             </div>
+
+            {/* Jarvis Gym Acesso Rapido */}
+            <a href="/workout" className="glass-panel p-5 rounded-[2rem] group cursor-pointer border-t border-white/5 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 block mb-6">
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent pointer-events-none"></div>
+                <div className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-orange-950/40 w-fit p-3 rounded-2xl border border-orange-500/20 shadow-[0_0_15px_rgba(249,115,22,0.15)] group-hover:bg-orange-500/20 transition-colors">
+                            <Dumbbell className="w-6 h-6 text-orange-400" />
+                        </div>
+                        <div className="flex flex-col">
+                            <h4 className="text-white font-bold text-lg">Academia TBrain</h4>
+                            <span className="text-xs text-zinc-400 font-medium tracking-wide">Acessar treinos guiados por IA</span>
+                        </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-orange-500/10 group-hover:text-orange-400 transition-colors">
+                        ▶
+                    </div>
+                </div>
+            </a>
+
 
             {/* Cenário Global Unificado */}
             <div className="mt-2 flex flex-col gap-3">
